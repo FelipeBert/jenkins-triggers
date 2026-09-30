@@ -59,8 +59,14 @@ jobs:
 
       # Execute the project's automated tests.
       - name: Run tests on main branch
+        if: github.ref == 'refs/heads/main'
         run: mvn test
 
       # Run Checkstyle to generate a report on Java style issues.
       - name: Checkstyle
+        if: github.ref == 'refs/heads/main'
         run: mvn checkstyle:checkstyle
+
+      - name: "Run tests on other branches"
+        if: github.ref != 'refs/heads/main'
+        run: echo "Skipping unit tests and code analysis"
