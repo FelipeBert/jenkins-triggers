@@ -17,6 +17,10 @@ on:
   schedule:
     - cron: "0 15 * * 1-5"   
 
+# Study-purpose example only: in production, store this value as a repository-level variable.
+env:
+  ECR_REPOSITORY: 'vprofile-appimage'
+
 # Limit the workflow's repository permissions to read-only contents.
 permissions:
   contents: read
@@ -98,3 +102,42 @@ jobs:
         with:
           name: trivy-scan-results
           path: trivy-results.json
+
+  # Publish the validated application image to AWS ECR for deployment.
+  BUILD_AND_PUBLISH:
+    name: BUILD_AND_PUBLISH
+    runs-on: ubuntu-latest
+    environment: production
+    # Run only after the build, testing, and security validation jobs succeed.
+    needs: [Build, Testing, Security_Scan]
+    # Only publish from the main branch.
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: "Code checkout"
+        uses: actions/checkout@v5
+        with:
+          # Fetch complete Git history instead of the default shallow clone.
+          fetch-depth: 0
+
+      # Configure AWS credentials for the deployment environment.
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Authenticate Docker to Amazon ECR so the image can be pushed.
+      - name: "Login to Amazon ECR"
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Build, tag, and push the application image to Amazon ECR.
+      - name: "Build tag and push image to Amazon ECR"
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f Docker-files/app/multistage/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
