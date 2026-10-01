@@ -11,11 +11,7 @@ on:
     branches: ['main']
 
   # Allow the workflow to be started manually.
-  workflow_dispatch:
-
-  # Run at 15:00 UTC on weekdays.
-  schedule:
-    - cron: "0 15 * * 1-5"   
+  workflow_dispatch:  
 
 # Study-purpose example only: in production, store this value as a repository-level variable.
 env:
